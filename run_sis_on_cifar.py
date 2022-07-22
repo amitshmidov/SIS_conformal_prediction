@@ -28,6 +28,7 @@ import os
 import numpy as np
 import torch
 from torchvision import datasets
+from torchvision.models import resnet18
 from tqdm import tqdm
 
 import additional_datasets
@@ -35,8 +36,11 @@ import inference_util
 import sis_util
 import util.misc_util as misc_util
 import util.data_util as data_util
+from config import DEVICE
 from sufficient_input_subsets import sis
 
+# import os
+# os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 DATASET_OPTIONS = [
     'cifar10_train',
@@ -65,12 +69,14 @@ args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 print(args)
 
-device = torch.device('cuda' if args.cuda else 'cpu')
+# device = torch.device('cuda' if args.cuda else 'cpu')
+device = DEVICE
 print('Using device: ', device)
 print()
 
 # Load model from checkpoint.
 model = inference_util.load_saved_model(args.saved_model_dir)
+# model = resnet18()
 model.to(device)
 model.eval()
 print('Loaded model')

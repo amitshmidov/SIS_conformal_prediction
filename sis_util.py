@@ -4,8 +4,8 @@ import numpy as np
 import torch
 
 import inference_util
+from config import DEVICE
 from sufficient_input_subsets import sis
-
 
 def make_f_for_class(model, class_idx, batch_size=128, add_softmax=False):
     def f(inputs):
@@ -13,9 +13,9 @@ def make_f_for_class(model, class_idx, batch_size=128, add_softmax=False):
             ret_np = False
             if isinstance(inputs, np.ndarray):
                 ret_np = True
-                inputs = torch.from_numpy(inputs).cuda()
+                inputs = torch.from_numpy(inputs).to(DEVICE)
             else:
-                inputs = inputs.cuda()
+                inputs = inputs.to(DEVICE)
             num_batches = int(np.ceil(inputs.shape[0] / batch_size))
             all_preds = []
             for batch_idx in range(num_batches):
@@ -40,9 +40,9 @@ def find_sis_on_input(model, x, initial_mask, fully_masked_input, threshold,
                       batch_size=128, add_softmax=False):
     """Find first SIS on input x with PyTorch model."""
     if isinstance(x, np.ndarray):
-        x = torch.from_numpy(x).cuda()
+        x = torch.from_numpy(x).to(DEVICE)
     with torch.no_grad():
-        pred = model(x.unsqueeze(0).cuda())[0]
+        pred = model(x.unsqueeze(0).to(DEVICE))[0]
         pred_class = int(pred.argmax())
         pred_confidence = float(pred.max())
     if pred_confidence < threshold:
