@@ -36,7 +36,7 @@ import inference_util
 import sis_util
 import util.misc_util as misc_util
 import util.data_util as data_util
-from config import DEVICE
+
 from sufficient_input_subsets import sis
 
 # import os
@@ -56,6 +56,8 @@ parser.add_argument('--saved_model_dir', type=str, required=True,
                     help='Path to saved model directory')
 parser.add_argument('--dataset', required=True, choices=DATASET_OPTIONS,
                     help='Dataset name')
+parser.add_argument('--data_path', required=True,
+                    help='Dataset path')
 parser.add_argument('--start_idx', type=int, required=True,
                     help='Start idx into dataset (inclusive)')
 parser.add_argument('--end_idx', type=int, required=True,
@@ -84,32 +86,32 @@ print('Loaded model')
 # Load dataset.
 if args.dataset == 'cifar10_train':
     transform = data_util.cifar_test_transform()  # No augmentation
-    dataset = datasets.CIFAR10(root='data/',
+    dataset = datasets.CIFAR10(root=args.data_path,
                                train=True,
                                transform=transform,
                                download=True)
 elif args.dataset == 'cifar10_test':
     transform = data_util.cifar_test_transform()
-    dataset = datasets.CIFAR10(root='data/',
+    dataset = datasets.CIFAR10(root=args.data_path,
                                train=False,
                                transform=transform,
                                download=True)
 elif args.dataset == 'cifar100_train':
     transform = data_util.cifar_test_transform()  # No augmentation
-    dataset = datasets.CIFAR100(root='data/',
+    dataset = datasets.CIFAR100(root=args.data_path,
                                 train=True,
                                 transform=transform,
                                 download=True)
 elif args.dataset == 'cifar100_test':
     transform = data_util.cifar_test_transform()
-    dataset = datasets.CIFAR100(root='data/',
+    dataset = datasets.CIFAR100(root=args.data_path,
                                 train=False,
                                 transform=transform,
                                 download=True)
 elif args.dataset == 'cifar10c_sample':
     transform = data_util.cifar_test_transform()
     dataset = additional_datasets.CIFAR10C(
-        root_dir='data/CIFAR-10-C',
+        root_dir=args.data_path,
         sis_sample=True,
         transform=transform,
     )

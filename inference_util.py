@@ -3,7 +3,7 @@
 import numpy as np
 import os
 import torch
-
+from config import DEVICE
 import augmentations
 from model import ensemble, model_util
 from util import data_util, misc_util
@@ -37,7 +37,7 @@ def load_saved_model(saved_model_dir):
         )
 
     checkpoint_path = misc_util.get_checkpoint_path(saved_model_dir)
-    model.load_state_dict(torch.load(checkpoint_path))
+    model.load_state_dict(torch.load(checkpoint_path, map_location=DEVICE))
     return model
 
 

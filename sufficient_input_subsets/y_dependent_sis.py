@@ -62,7 +62,7 @@ if __name__ == '__main__':
     model.to(DEVICE)
     model.eval()
 
-    start_idx, end_idx = 0, 5
+    start_idx, end_idx = 0, 1
     sis_out_dir = "../saved_models/resnet18_rep1"
 
     compute_sis_on_all_classes(model, dataset, sis_threshold, start_idx, end_idx, sis_out_dir)

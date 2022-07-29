@@ -1,3 +1,3 @@
 import torch
 
-DEVICE = torch.device('mps')
+DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('mps')
