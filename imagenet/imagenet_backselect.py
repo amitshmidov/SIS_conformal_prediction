@@ -153,8 +153,7 @@ class BackselectResult(
 
 
 
-
-def run_gradient_backward_selection(images, model, remove_per_iter, max_iters=None,
+def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2, max_iters=None,
                                     add_random_noise=True,
                                     random_noise_variance=1e-12,
                                     cuda=True):
@@ -183,7 +182,9 @@ def run_gradient_backward_selection(images, model, remove_per_iter, max_iters=No
     # Compute initial predicted class.
     softmax = torch.nn.Softmax(dim=1)
     original_confidences = softmax(model(images))
-    original_pred_confidences, original_pred_classes = original_confidences.max(axis=1)
+    original_pred_confidences, original_pred_classes = get_k_highest_val(original_confidences, label_rank)
+    print(f'pred {original_pred_classes}')
+    # original_pred_confidences, original_pred_classes = original_confidences.max(axis=1)
     # print('original_pred_confidences: ', original_pred_confidences)
     # print('original_pred_classes: ', original_pred_classes)
 
@@ -209,7 +210,7 @@ def run_gradient_backward_selection(images, model, remove_per_iter, max_iters=No
         # Compute confidences on masked images toward original predicted classes.
         confidences = softmax(model(masked_images))
         pred_confidences = confidences.gather(1, original_pred_classes.unsqueeze(1))
-        # print(i, 'pred_confidences: ', pred_confidences.flatten().detach().cpu().numpy())
+        print(i, 'pred_confidences: ', pred_confidences.flatten().detach().cpu().numpy())
 
         # Compute gradients.
         torch.sum(pred_confidences).backward()
@@ -267,3 +268,9 @@ def run_gradient_backward_selection(images, model, remove_per_iter, max_iters=No
         ))
 
     return to_return
+
+
+def get_k_highest_val(x: torch.Tensor, k):
+    top_values, top_indices = torch.topk(x, k)
+    return top_values[..., -1], top_indices[..., -1]
+
