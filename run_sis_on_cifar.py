@@ -36,6 +36,7 @@ import inference_util
 import sis_util
 import util.misc_util as misc_util
 import util.data_util as data_util
+from config import DEVICE
 
 from sufficient_input_subsets import sis
 

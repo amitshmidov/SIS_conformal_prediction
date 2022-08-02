@@ -4,6 +4,9 @@ import collections
 import numpy as np
 import os
 import torch
+from tqdm import tqdm
+
+from config import DEVICE
 
 
 class BackselectResult(
@@ -164,7 +167,7 @@ def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2
     model.eval()
 
     if cuda:
-        images = images.cuda()
+        images = images.to(DEVICE)
 
     # Initialize masks as all zeros.
     if cuda:
@@ -172,18 +175,18 @@ def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2
     else:
         device = 'cpu'
     masks = torch.zeros(images.shape[0], 1, images.shape[2], images.shape[3],
-                        device=device, requires_grad=True)
+                        device="cpu", requires_grad=True)
     masks_history = torch.zeros(
-        images.shape[0], 1, images.shape[2], images.shape[3], device=device,
+        images.shape[0], 1, images.shape[2], images.shape[3], device="cpu",
         dtype=torch.int)
     # print(masks_history.shape)
     # print('masks.shape: ', masks.shape)
 
     # Compute initial predicted class.
     softmax = torch.nn.Softmax(dim=1)
-    original_confidences = softmax(model(images))
+    original_confidences = softmax(model(images)).cpu()
     original_pred_confidences, original_pred_classes = get_k_highest_val(original_confidences, label_rank)
-    print(f'pred {original_pred_classes}')
+    # print(f'pred {original_pred_classes}')
     # original_pred_confidences, original_pred_classes = original_confidences.max(axis=1)
     # print('original_pred_confidences: ', original_pred_confidences)
     # print('original_pred_classes: ', original_pred_classes)
@@ -196,21 +199,21 @@ def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2
             np.prod(masks.shape[1:]) / float(remove_per_iter)))
     # print('max_iters: ', max_iters)
 
-    for i in range(max_iters):
+    for i in tqdm(range(max_iters)):
         # Reset gradients.
         model.zero_grad()
         if masks.grad is not None:
             masks.grad.data.zero_()
 
         # Compute masked inputs.
-        masked_images = (1 - masks) * images
+        masked_images = (1 - masks) * images.cpu()
         if cuda:
-            masked_images = masked_images.cuda()
+            masked_images = masked_images.to(DEVICE)
 
         # Compute confidences on masked images toward original predicted classes.
-        confidences = softmax(model(masked_images))
+        confidences = softmax(model(masked_images)).cpu()
         pred_confidences = confidences.gather(1, original_pred_classes.unsqueeze(1))
-        print(i, 'pred_confidences: ', pred_confidences.flatten().detach().cpu().numpy())
+        # print(i, 'pred_confidences: ', pred_confidences.flatten().detach().cpu().numpy())
 
         # Compute gradients.
         torch.sum(pred_confidences).backward()
@@ -219,8 +222,9 @@ def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2
         if add_random_noise:
             noise = (torch.randn(masks.shape) * (random_noise_variance**0.5))
             if cuda:
-                noise = noise.cuda()
+                noise = noise.to(DEVICE)
             grad_vals += noise
+
 
         # Find optimal pixels to mask, excluding previously masked values.
         not_yet_masked_idxs_tuple = (1 - masks).flatten(start_dim=1).nonzero(as_tuple=True)
@@ -239,13 +243,13 @@ def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2
             torch.arange(masks.shape[0]).unsqueeze(1).expand(-1, to_mask_idxs_offset.shape[1]).flatten(),
             to_mask_idxs_offset.flatten(),
         ].reshape(masks.shape[0], -1)
-        to_mask_idxs_mask = torch.zeros(masks.shape[0], masks.shape[2], masks.shape[3], device=device, dtype=torch.bool)
+        to_mask_idxs_mask = torch.zeros(masks.shape[0], masks.shape[2], masks.shape[3], device="cpu", dtype=torch.bool)
         to_mask_idxs_mask.view(masks.shape[0], -1)[
             torch.arange(masks.shape[0]).unsqueeze(1).expand(-1, to_mask_idxs_offset.shape[1]).flatten(),
             to_mask_idxs.flatten(),
         ] = 1
         to_mask_idxs_mask = to_mask_idxs_mask.unsqueeze(1)  # Add broadcast over channels dimension.
-        assert bool(torch.all(to_mask_idxs_mask.sum(dim=(2,3)).flatten() == to_mask_idxs_offset.shape[1]))
+        assert bool(torch.all(to_mask_idxs_mask.sum(dim=(2, 3)).flatten() == to_mask_idxs_offset.shape[1]))
         assert (to_mask_idxs_mask + masks).max() == 1
 
         # Update mask and history.
@@ -253,12 +257,12 @@ def run_gradient_backward_selection(images, model, remove_per_iter, label_rank=2
             masks[to_mask_idxs_mask] = 1
             masks_history[to_mask_idxs_mask] = i
 
-        confidences_history.append(confidences.detach().cpu().numpy())
+        confidences_history.append(confidences.detach().numpy())
 
     # Create BackselectResult objects.
     confidences_history = np.array(confidences_history)  # For slicing.
     to_return = []
-    for i in range(images.shape[0]):
+    for i in tqdm(range(images.shape[0])):
         to_return.append(BackselectResult(
             original_confidences=(
                 original_confidences[i].detach().cpu().numpy()),
