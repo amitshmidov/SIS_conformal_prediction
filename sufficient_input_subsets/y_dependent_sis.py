@@ -336,7 +336,7 @@ def generate_sis(num_images, sis_thresholds, original_prob_relative_list):
 
 
 if __name__ == '__main__':
-    num_images = 200
+    num_images = 1000
     # num_images = 5
 
     sis_thresholds = [0.95, 0.9, 0.8, 0.5, 0.3, 0.15]

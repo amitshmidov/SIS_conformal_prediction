@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import os
 import torch
@@ -5,47 +7,45 @@ from torchvision import datasets
 
 from util import data_util
 
-
-def get_image_from_sis_file_name(sis_file_name):
-    image_i = sis_file_name.split("__")[1].split("_")[1]
-    return int(image_i)
-
-
-def get_class_from_sis_file_name(sis_file_name):
-    class_i = sis_file_name.split("__")[2].split("_")[1].split(".")[0]
-    return int(class_i)
+# np.random.seed(42)
 
 
 def load_sis(experiment_name):
-    sis_files = [f for f in os.listdir(f"../saved_models/{experiment_name}/") if "npz" in f]
-    images_idx = [get_image_from_sis_file_name(file_name) for file_name in sis_files]
-    classes_idx = [get_class_from_sis_file_name(file_name) for file_name in sis_files]
-    sis = np.zeros((np.max(images_idx) + 1, np.max(classes_idx) + 1))
-
-    for image_i in images_idx:
-        for class_i in classes_idx:
-            file_name = f"cifar10_test__image_{image_i}__class_{class_i}.npz"
-            full_file_name = f"../saved_models/{experiment_name}/{file_name}"
-            if file_name in sis_files:
-                sis[image_i, class_i] = np.load(full_file_name)["mask"].sum()
-            else:
-                sis[image_i, class_i] = 0
+    with open(f"../sufficient_input_subsets/approx_sis_results/{experiment_name}.pkl", "rb") as results_file:
+        results_dict = pickle.load(results_file)
+    num_images = results_dict["masks_sizes"].shape[1]
+    sis = np.zeros((num_images, 10))
+    for i in range(num_images):
+        for rank in range(10):
+            sis[i, results_dict["pred_labels"][rank, i].astype(int)] = results_dict["masks_sizes"][rank, i]
     return sis
 
 
-# def compute_quantiles(X, Y, alpha, tau, experiment_name):
-#     n = X.shape[0]
-#     sis_tau = load_sis(experiment_name)
-#     Q = np.sort(sis_tau, axis=0)[np.floor(alpha * (n + 1))]  # vector of Q_y-s for each y value
-#
-#
-# def compute_prediction_set(x_test, Y, tau, alpha, experiment_name):
-#     Q = compute_quantiles(X, Y, alpha, tau, experiment_name)
+def compute_quantiles(alpha, sis):
+    n = sis.shape[0]
+    Q = np.sort(sis, axis=0)[np.floor(alpha * (n + 1)).astype(int), :]
+    print(f"Quantile: {Q}")
+    return Q
 
 
-# if __name__ == '__main__':
-    # transform = data_util.cifar_test_transform()
-    # dataset = datasets.CIFAR10(root='data/',
-    #                            train=False,
-    #                            transform=transform,
-    #                            download=True)
+def compute_prediction_set(alpha, calibration_sis, test_sis):
+    Q = compute_quantiles(alpha, calibration_sis)
+    return np.where(test_sis >= Q)[0]
+
+
+if __name__ == '__main__':
+    transform = data_util.cifar_test_transform()
+    dataset = datasets.CIFAR10(root='data/',
+                               train=False,
+                               transform=transform,
+                               download=True)
+
+    experiment_name = "1000_images__015_threshold__absolute"
+    sis = load_sis(experiment_name)
+    test_image = np.random.choice(range(sis.shape[0]))
+    calibration_sis = np.vstack([sis[:test_image, :], sis[test_image+1:, :]])
+    test_sis = sis[test_image, :]
+    print(f"Test image index: {test_image}")
+    print(f"Test image SIS: {test_sis}")
+    print(f"Prediction set: {compute_prediction_set(0.95, calibration_sis, test_sis)}")
+    print(f"True label: {dataset[test_image][1]}")
