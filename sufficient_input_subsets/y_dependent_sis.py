@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torchvision import datasets
 from tqdm import tqdm
-
+from pathlib import Path
 import inference_util
 import sis_util
 from config import DEVICE
@@ -270,27 +270,26 @@ def find_sis_mask_from_backselect_result(bs_result, sis_threshold):
     return mask
 
 
-def generate_sis(num_images, sis_thresholds, original_prob_relative_list):
-    transform = data_util.cifar_test_transform()
-    dataset = datasets.CIFAR10(root='data/',
-                               train=False,
-                               transform=transform,
-                               download=True)
+def generate_sis(dataset, num_images, sis_thresholds, original_prob_relative_list, results_path):
+    results_path = results_path + f'{num_images}_images/'
+    Path(results_path).mkdir(parents=True, exist_ok=True)
     data_loader = torch.utils.data.DataLoader(dataset=dataset,
                                               batch_size=num_images,
                                               shuffle=False,
                                               pin_memory=True,
                                               num_workers=2)
 
+    remove_per_iter = 10
+    max_iters = None
+    images, labels = next(iter(data_loader))
     sis_out_dir = "../saved_models/resnet18_single_epoch"
     # sis_out_dir = "../saved_models/resnet18_rep1"
     model = inference_util.load_saved_model(sis_out_dir + "/")
     model.to(DEVICE)
     model.eval()
 
-    remove_per_iter = 10
-    max_iters = None
-    images, labels = next(iter(data_loader))
+
+
     print("Data loaded")
 
     all_sis_all_ranks_results = {}
@@ -318,13 +317,15 @@ def generate_sis(num_images, sis_thresholds, original_prob_relative_list):
     # results = {"masks_sizes": all_masks_sizes, "corrects": all_corrects, "pred_labels": all_pred_labels}
 
     for sis_i, sis_threshold in enumerate(sis_thresholds):
-        with open(f"../sufficient_input_subsets/approx_sis_results/"
+        with open(f"{results_path}"
                   f"{num_images}_images__"
                   f"{str(sis_threshold).replace('.', '')}_threshold__"
                   f"{'relative' if original_prob_relative_list[sis_i] else 'absolute'}.pkl", "wb") as results_file:
             pickle.dump({"masks_sizes": all_sis_all_ranks_results[str(sis_threshold)]["all_masks_sizes"],
                          "corrects": all_sis_all_ranks_results[str(sis_threshold)]["all_corrects"],
                          "pred_labels": all_sis_all_ranks_results[str(sis_threshold)]["all_pred_labels"]}, results_file)
+    with open(results_path + f'{num_images}_images.pkl', 'wb') as images_file:
+        pickle.dump(images, images_file)
 
     # sis_threshold = 0.5
     # threshold_confidence = original_pred
@@ -336,15 +337,20 @@ def generate_sis(num_images, sis_thresholds, original_prob_relative_list):
 
 
 if __name__ == '__main__':
-    num_images = 200
+    num_images = 1000
     # num_images = 5
 
     sis_thresholds = [0.95, 0.9, 0.8, 0.5, 0.3, 0.15]
+    # sis_thresholds = [0.5]
     # sis_thresholds = [0.95, 0.9, 0.8]
     original_prob_relative_list = [True, True, True, False, False, False]
     # original_prob_relative_list = [True, True, True]
-
-    generate_sis(num_images, sis_thresholds, original_prob_relative_list)
+    transform = data_util.cifar_test_transform()
+    dataset = datasets.CIFAR10(root='/home/niv.ko/data/',
+                               train=False,
+                               transform=transform,
+                               download=True)
+    generate_sis(dataset, num_images, sis_thresholds, original_prob_relative_list, '/home/niv.ko/data/sis_results/')
     # generate_sis(num_images, [0.95], [True])
     # generate_sis(num_images, [0.9], [True])
     # generate_sis(num_images, [0.8], [True])

@@ -67,7 +67,7 @@ class MLP(nn.Module):
                 new_nonlins.append(nonlin)
             else:
                 new_nonlins.append(ACTIVATIONS[nonlin](ACTIVATION_DEFAULT_KWARGS[nonlin]))
-        self.seq = nn.Sequential(*sum(zip(layers, new_nonlins), start=()))
+        self.seq = nn.Sequential(*sum(zip(layers, new_nonlins), ()))
         # ========================
 
     def forward(self, x: Tensor) -> Tensor:
